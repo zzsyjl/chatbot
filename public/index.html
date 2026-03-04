@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 聊天助手 - ChatGPT Clone</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" id="newChatBtn">
+                    <span>+</span> 新对话
+                </button>
+            </div>
+            <div class="chat-history" id="chatHistory">
+                <!-- 聊天历史将在这里显示 -->
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="header">
+                <div class="header-controls">
+                    <div class="search-toggle-wrapper">
+                        <label for="searchToggle" class="search-toggle-label">
+                            <input type="checkbox" id="searchToggle" class="search-toggle-checkbox">
+                            <span class="search-toggle-slider"></span>
+                            <span class="search-toggle-text">联网搜索</span>
+                        </label>
+                    </div>
+                    <div class="model-selector-wrapper">
+                        <label for="modelSelect" class="model-label">模型:</label>
+                        <select id="modelSelect" class="model-select">
+                            <option value="deepseek-chat">DeepSeek Chat</option>
+                            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-message">
+                    <h1>AI 聊天助手</h1>
+                    <p>基于 DeepSeek AI 的智能对话助手</p>
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="输入消息..." 
+                        rows="1"
+                    ></textarea>
+                    <button id="sendBtn" class="send-btn">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M2 10L18 2L12 10L18 18L2 10Z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

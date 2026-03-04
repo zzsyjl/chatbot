@@ -1,0 +1,5 @@
+# DuckDuckGo 搜索测试脚本依赖
+# 安装: pip install -r requirements-duckduckgo-test.txt
+# 运行: python test_duckduckgo_search.py
+
+ddgs>=9.0.0
