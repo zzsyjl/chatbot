@@ -3,19 +3,23 @@ const cors = require('cors');
 const path = require('path');
 const https = require('https');
 const http = require('http');
-const { spawn } = require('child_process');
-const { search: duckDuckGoSearch, SafeSearchType } = require('duck-duck-scrape');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // DeepSeek API 配置
-// 从环境变量读取 API Key，避免在代码中硬编码敏感信息
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 if (!DEEPSEEK_API_KEY) {
   console.error('[配置错误] 未设置 DEEPSEEK_API_KEY 环境变量，请在项目根目录的 .env 文件中配置。');
 }
+
+// Brave Search API 配置
+const BRAVE_SEARCH_API_KEY = process.env.BRAVE_SEARCH_API_KEY;
+if (!BRAVE_SEARCH_API_KEY) {
+  console.error('[配置错误] 未设置 BRAVE_SEARCH_API_KEY 环境变量，请在项目根目录的 .env 文件中配置。');
+}
+const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODELS_URL = 'https://api.deepseek.com/v1/models';
 const DEFAULT_MODEL = 'deepseek-chat';
@@ -39,39 +43,48 @@ app.get('/api/models', (req, res) => {
   res.json({ models: AVAILABLE_MODELS });
 });
 
-// 联网搜索功能（使用 DuckDuckGo 搜索）
-// 需配置网络代理才能访问 DuckDuckGo（如 HTTP_PROXY、HTTPS_PROXY 环境变量）
+// 联网搜索功能（使用 Brave Search API）
 async function searchWeb(query, maxResults = 5) {
   try {
-    // 从环境变量读取代理配置，needle 库需要显式传入
-    const proxy = process.env.HTTPS_PROXY || process.env.https_proxy ||
-      process.env.HTTP_PROXY || process.env.http_proxy;
-    const needleOptions = proxy ? { proxy } : {};
-
-    const ddgResult = await duckDuckGoSearch(query, {
-      safeSearch: SafeSearchType.OFF,
-      locale: 'zh-cn',
-      region: 'cn-zh'
-    }, needleOptions);
-
-    if (ddgResult.noResults || !ddgResult.results || ddgResult.results.length === 0) {
-      console.log(`[搜索] DuckDuckGo 未返回结果，尝试 Python ddgs（Bing 回退）...`);
-      const pyResults = await searchWebWithPython(query, maxResults);
-      if (pyResults.length > 0) {
-        console.log(`[搜索] Python ddgs 找到 ${pyResults.length} 个结果`);
-        return pyResults;
-      }
+    if (!BRAVE_SEARCH_API_KEY) {
+      console.error('[搜索] 未配置 BRAVE_SEARCH_API_KEY');
       return searchWebFallback(query, maxResults);
     }
 
-    // 转换为前端期望的格式 { title, url, snippet }
-    let results = ddgResult.results.slice(0, maxResults).map(r => ({
+    const params = new URLSearchParams({
+      q: query,
+      count: String(maxResults),
+      search_lang: 'zh-hans',
+      text_decorations: 'false'
+    });
+
+    const response = await fetch(`${BRAVE_SEARCH_URL}?${params}`, {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': BRAVE_SEARCH_API_KEY
+      }
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Brave Search API 返回 ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const webResults = data.web?.results || [];
+
+    if (webResults.length === 0) {
+      console.log('[搜索] Brave Search 未返回结果');
+      return searchWebFallback(query, maxResults);
+    }
+
+    let results = webResults.slice(0, maxResults).map(r => ({
       title: r.title || '无标题',
       url: r.url || '',
       snippet: r.description || ''
     }));
 
-    // 可选：获取前几个结果的网页内容以丰富摘要
     if (results.length > 0) {
       const contentPromises = results.slice(0, Math.min(3, results.length)).map(result =>
         fetchWebPageContent(result.url).catch(() => null)
@@ -85,57 +98,21 @@ async function searchWeb(query, maxResults = 5) {
       });
     }
 
-    console.log(`[搜索] DuckDuckGo 找到 ${results.length} 个结果`);
+    console.log(`[搜索] Brave Search 找到 ${results.length} 个结果`);
     return results;
   } catch (err) {
-    console.error('[搜索] DuckDuckGo 请求失败:', err.message, '，尝试 Python ddgs（Bing 回退）...');
-    const pyResults = await searchWebWithPython(query, maxResults);
-    if (pyResults.length > 0) {
-      console.log(`[搜索] Python ddgs 找到 ${pyResults.length} 个结果`);
-      return pyResults;
-    }
+    console.error('[搜索] Brave Search 请求失败:', err.message);
     return searchWebFallback(query, maxResults);
   }
 }
 
-// 使用 Python ddgs 脚本搜索（DuckDuckGo + Bing 回退，国内无代理也可用）
-// 若默认 python3 未安装 ddgs，请设置环境变量：SEARCH_PYTHON=/path/to/python（如 conda 环境的 python）
-function searchWebWithPython(query, maxResults = 5) {
-  return new Promise((resolve) => {
-    const scriptPath = path.join(__dirname, 'search_with_ddgs.py');
-    const pythonCmd = process.env.SEARCH_PYTHON || 'python3';
-    const py = spawn(pythonCmd, [scriptPath, query, String(maxResults)], {
-      cwd: __dirname,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    let stdout = '';
-    let stderr = '';
-    py.stdout.setEncoding('utf8');
-    py.stdout.on('data', (chunk) => { stdout += chunk; });
-    py.stderr.on('data', (chunk) => { stderr += chunk; });
-    py.on('error', (err) => {
-      console.error('[搜索] Python 脚本启动失败:', err.message);
-      resolve([]);
-    });
-    py.on('close', (code) => {
-      if (code !== 0 && stderr) console.error('[搜索] Python 脚本 stderr:', stderr.trim());
-      try {
-        const arr = JSON.parse(stdout.trim() || '[]');
-        resolve(Array.isArray(arr) ? arr : []);
-      } catch (e) {
-        resolve([]);
-      }
-    });
-  });
-}
-
-// 备用搜索方法：所有搜索都不可用时返回可点击的搜索链接
+// 备用搜索方法：API 不可用时返回可点击的搜索链接
 async function searchWebFallback(query, maxResults = 5) {
   const encodedQuery = encodeURIComponent(query);
   return [{
     title: `搜索"${query}"`,
-    url: `https://duckduckgo.com/?q=${encodedQuery}`,
-    snippet: `由于网络限制或 DuckDuckGo 服务不可用，未能直接获取网页内容。请确保已配置网络代理（HTTP_PROXY/HTTPS_PROXY），然后点击链接在浏览器中查看关于"${query}"的搜索结果。`
+    url: `https://search.brave.com/search?q=${encodedQuery}`,
+    snippet: `未能通过 Brave Search API 获取搜索结果。请检查 BRAVE_SEARCH_API_KEY 是否正确配置，然后点击链接在浏览器中查看关于"${query}"的搜索结果。`
   }];
 }
 
