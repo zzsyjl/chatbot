@@ -1,6 +1,9 @@
 # 复制到家庭服务器 ~/.cloudflared/config.yml，或与现有配置合并 ingress。
 # 将 <TUNNEL-UUID> 换为 cloudflared tunnel create 输出的 UUID
 # credentials-file 路径一般为 ~/.cloudflared/<TUNNEL-UUID>.json
+#
+# DNS（橙云代理）：若 llm-compare 直连 <UUID>.cfargotunnel.com 在部分网络出现 ERR_CONNECTION_CLOSED，
+# 可将 llm-compare.yjl.app 的 CNAME 指向已稳定的 chat.yjl.app（仍为橙云），Tunnel ingress 仍保留本主机名。
 
 tunnel: <TUNNEL-UUID>
 credentials-file: /home/YOUR_USER/.cloudflared/<TUNNEL-UUID>.json
