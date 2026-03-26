@@ -1,0 +1,11 @@
+# 复制到家庭服务器 ~/.cloudflared/config.yml，或与现有配置合并 ingress。
+# 将 <TUNNEL-UUID> 换为 cloudflared tunnel create 输出的 UUID
+# credentials-file 路径一般为 ~/.cloudflared/<TUNNEL-UUID>.json
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /home/YOUR_USER/.cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: llm-compare.yjl.app
+    service: http://127.0.0.1:3000
+  - service: http_status:404
