@@ -21,7 +21,7 @@ body {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    transition: margin-left 0.3s ease;
+    transition: margin-left 0.3s ease, transform 0.3s ease;
 }
 
 .sidebar.collapsed {
@@ -641,26 +641,68 @@ body {
 /* ─── 响应式 ─── */
 @media (max-width: 1000px) {
     .sidebar { width: 220px; }
+    .sidebar.collapsed { margin-left: -220px; }
     .app-subtitle { display: none; }
 }
 
-@media (max-width: 768px) {
+/*
+ * 侧栏 position:fixed 时若仍为 flex 子项，会继续占用宽度，主区被压成窄条 + 768px 单列网格，
+ * 线上平板/分屏会像「样式坏了」。改为 block 布局让主区占满视口，侧栏叠在上方。
+ */
+@media (max-width: 900px) {
+    .app {
+        display: block;
+        height: 100vh;
+        position: relative;
+    }
+
     .sidebar {
         position: fixed;
         left: 0;
         top: 0;
         height: 100%;
         z-index: 100;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+        margin-left: 0;
     }
 
-    .sidebar.collapsed { margin-left: -260px; }
+    .sidebar.collapsed {
+        margin-left: 0;
+        transform: translateX(-100%);
+    }
 
+    .sidebar:not(.collapsed) {
+        transform: translateX(0);
+    }
+
+    .main-area {
+        width: 100%;
+        height: 100vh;
+        min-height: 0;
+    }
+}
+
+/* 极窄屏：三列横向滑动，避免纵向三坨堆叠 */
+@media (max-width: 560px) {
     .columns-container {
-        grid-template-columns: 1fr;
-        gap: 0;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 1px;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
     }
 
-    .model-column { max-height: 33.33vh; }
-    .column-chat { min-height: 120px; }
+    .model-column {
+        flex: 0 0 min(92vw, 360px);
+        min-width: min(92vw, 280px);
+        max-height: none;
+        scroll-snap-align: start;
+    }
+
+    .column-chat {
+        min-height: min(50vh, 320px);
+    }
 }
