@@ -6,6 +6,7 @@ tunnel: <TUNNEL-UUID>
 credentials-file: /home/YOUR_USER/.cloudflared/<TUNNEL-UUID>.json
 
 ingress:
+  # 与 chat.yjl.app 一致使用 localhost:3000，避免部分环境下 127.0.0.1 与 localhost 解析差异
   - hostname: llm-compare.yjl.app
-    service: http://127.0.0.1:3000
+    service: http://localhost:3000
   - service: http_status:404
