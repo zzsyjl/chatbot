@@ -14,6 +14,9 @@ rsync -avz --delete \
   --exclude '.git' \
   --exclude '.playwright-mcp' \
   --exclude '*.log' \
+  --exclude 'test-result.png' \
+  --exclude 'three-column-layout.png' \
+  --exclude 'three-models-working.png' \
   "${SCRIPT_DIR}/" "${SSH_HOST}:${REMOTE_DIR}/"
 
 echo "==> [2/5] 同步 .env 文件（包含 API Key）..."
