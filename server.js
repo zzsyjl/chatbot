@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -53,9 +54,41 @@ const PROVIDER_NAMES = {
   google: 'Google', minimax: 'MiniMax', zhipu: '智谱GLM', qwen: '通义千问'
 };
 
+/** 避免 Chrome 等浏览器长期磁盘缓存旧 CSS/JS（同机 Edge 正常多为缓存未命中）。容器每次启动生成新串，或设环境变量 ASSET_BUST */
+const ASSET_BUST = process.env.ASSET_BUST || String(Date.now());
+const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
+let cachedIndexHtml = null;
+function getIndexHtml() {
+  if (cachedIndexHtml) return cachedIndexHtml;
+  let html = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
+  html = html.replace(/href="\/styles\.css(\?[^"]*)?"/, `href="/styles.css?v=${ASSET_BUST}"`);
+  html = html.replace(/src="\/script\.js(\?[^"]*)?"/, `src="/script.js?v=${ASSET_BUST}"`);
+  cachedIndexHtml = html;
+  return cachedIndexHtml;
+}
+
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    Pragma: 'no-cache'
+  });
+  res.type('html');
+  res.send(getIndexHtml());
+});
+
+app.use(express.static('public', {
+  index: false,
+  setHeaders(res, filepath) {
+    if (/\.(css|js)$/i.test(filepath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate, max-age=0');
+    } else if (/\.html$/i.test(filepath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+  }
+}));
 
 // ─── API: 模型列表 ───
 app.get('/api/models', (req, res) => {
@@ -247,8 +280,6 @@ app.post('/api/compare', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
